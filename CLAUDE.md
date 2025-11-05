@@ -106,19 +106,19 @@ workspace-provisioning/
 The `coder-template/main.tf` uses **Coder's envbuilder** instead of pre-built images:
 
 1. **Runtime Image**: `ghcr.io/coder/envbuilder:latest`
-2. **Build Source**: `https://github.com/panchal-ravi/ai-iac-consumer-template`
-3. **Devcontainer Path**: `.devcontainer/claude-code/devcontainer.json`
+2. **Build Source**: `https://github.com/srlynch1/claude-devcontainer-no-cloud`
+3. **Devcontainer Path**: `.devcontainer/devcontainer.json`
 4. **Build Strategy**: On-demand from source during workspace creation
 
 **Key Configuration**:
 ```hcl
 env {
   name  = "ENVBUILDER_GIT_URL"
-  value = "https://github.com/panchal-ravi/ai-iac-consumer-template"
+  value = "https://github.com/srlynch1/claude-devcontainer-no-cloud"
 }
 env {
   name  = "ENVBUILDER_DEVCONTAINER_DIR"
-  value = ".devcontainer/claude-code"
+  value = ".devcontainer"
 }
 env {
   name  = "ENVBUILDER_WORKSPACE_FOLDER"
@@ -167,7 +167,14 @@ This approach uses Coder CLI instead of Terraform provider for simpler local dev
 
 ## Dev Container Overview
 
-The custom dev container is based on the [ai-iac-consumer-template](https://github.com/panchal-ravi/ai-iac-consumer-template) and includes:
+The custom dev container is based on a modified version of [ai-iac-consumer-template](https://github.com/panchal-ravi/ai-iac-consumer-template), optimized for faster builds by removing cloud CLI tools. Source: [claude-devcontainer-no-cloud](https://github.com/srlynch1/claude-devcontainer-no-cloud).
+
+Key modifications:
+- Cloud CLI tools (AWS, Azure, GCP) removed to reduce build time from 10-15 minutes to 2-3 minutes
+- All Terraform and IaC tools retained
+- `cloud-cli-tools.sh` replaced with stub script
+
+The dev container includes:
 
 ### Base Configuration
 - **Base Image**: Node.js 20
@@ -188,9 +195,8 @@ The custom dev container is based on the [ai-iac-consumer-template](https://gith
 - **pre-commit**: Git hooks framework for automated checks
 
 #### Cloud CLIs (via cloud-cli-tools.sh)
-- **AWS CLI v2**: Full AWS cloud management
-- **Azure CLI**: Microsoft Azure management
-- **Google Cloud CLI**: GCP management
+- **SKIPPED**: Cloud CLI tools (AWS, Azure, GCP) are intentionally excluded to reduce build time from 10-15 minutes to 2-3 minutes
+- The `cloud-cli-tools.sh` script is a stub that exits immediately
 
 #### Development Tools
 - **Git**: Version control with git-delta for improved diffs
@@ -223,12 +229,12 @@ The custom dev container is based on the [ai-iac-consumer-template](https://gith
 The devcontainer uses two library scripts during the build process:
 
 ### cloud-cli-tools.sh
-Installs cloud provider CLIs with architecture detection:
-- Detects system architecture (x86_64 or aarch64/arm64)
-- Installs AWS CLI v2 for the correct architecture
-- Installs Azure CLI via Microsoft's installation script
-- Installs Google Cloud SDK via apt repository
-- Creates credential directories for each cloud provider
+**STUB SCRIPT** - Cloud CLI installation is skipped for faster builds:
+- Original script installed AWS CLI v2, Azure CLI, and Google Cloud SDK
+- Installation took 10-15 minutes and added hundreds of MBs
+- Now replaced with a stub that exits immediately
+- Build time reduced to 2-3 minutes
+- Terraform and IaC tools are still fully installed
 
 ### terraform-tools.sh
 Installs Terraform ecosystem tools with configurable versions:
@@ -431,6 +437,29 @@ Docker Desktop uses `WaitForFirstConsumer` volume binding mode. Without `wait_un
 
 **Solution**: Always set `wait_until_bound = false` on PVCs in coder-template/main.tf.
 
+### Agent Connectivity Issues
+
+**Symptom**: Workspace shows "healthy: false", agent cannot connect, logs show:
+```
+curl: (7) Failed to connect to localhost port 8080
+error: failed to download coder agent
+```
+
+**Cause**: `CODER_ACCESS_URL` set to `http://localhost:8080` doesn't work from inside Kubernetes pods.
+
+**Solution**: Update `values.yaml` to use the LoadBalancer IP:
+```yaml
+- name: CODER_ACCESS_URL
+  value: "http://172.18.0.6"  # Use LoadBalancer IP, not localhost
+```
+
+Then upgrade the Coder deployment:
+```bash
+helm upgrade coder coder-v2/coder --namespace coder -f values.yaml
+```
+
+External users can still access Coder at `http://localhost:8080` via port-forward, while agents inside pods use the LoadBalancer IP to connect.
+
 ### Template Modification Guidelines
 
 **Adding Environment Variables**:
@@ -479,16 +508,18 @@ kubectl logs -n coder-workspaces <pod-name> -f
 
 ## Known Limitations
 
-1. **Docker-in-Docker**: Not available (Docker socket mount incompatible with Docker Desktop K8s)
-2. **Resource Constraints**: Limited by Docker Desktop VM resources
-3. **Persistence**: Data deleted when workspace is destroyed
-4. **Networking**: LoadBalancer only works on localhost
-5. **Build Time**: First workspace creation takes 5-10 minutes (envbuilder compilation)
+1. **Cloud CLI Tools**: AWS, Azure, and GCP CLIs not installed (skipped for faster builds)
+2. **Docker-in-Docker**: Not available (Docker socket mount incompatible with Docker Desktop K8s)
+3. **Resource Constraints**: Limited by Docker Desktop VM resources
+4. **Persistence**: Data deleted when workspace is destroyed
+5. **Networking**: LoadBalancer only works on localhost
+6. **Build Time**: First workspace creation takes 2-3 minutes (reduced by skipping cloud CLIs)
 
 ## References
 
-- [Source Repository](https://github.com/panchal-ravi/ai-iac-consumer-template)
-- [Devcontainer JSON](https://github.com/panchal-ravi/ai-iac-consumer-template/blob/main/.devcontainer/claude-code/devcontainer.json)
-- [Dockerfile](https://github.com/panchal-ravi/ai-iac-consumer-template/blob/main/.devcontainer/claude-code/Dockerfile)
+- [Source Repository](https://github.com/srlynch1/claude-devcontainer-no-cloud) - Modified devcontainer without cloud CLIs
+- [Original Repository](https://github.com/panchal-ravi/ai-iac-consumer-template) - Original devcontainer with cloud CLIs
+- [Devcontainer JSON](https://github.com/srlynch1/claude-devcontainer-no-cloud/blob/main/.devcontainer/devcontainer.json)
+- [Dockerfile](https://github.com/srlynch1/claude-devcontainer-no-cloud/blob/main/.devcontainer/Dockerfile)
 - [Coder Templates Documentation](https://coder.com/docs/templates)
 - [Coder Envbuilder](https://github.com/coder/envbuilder)
