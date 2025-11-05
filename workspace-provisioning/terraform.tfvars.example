@@ -1,0 +1,21 @@
+# Coder Configuration
+coder_url          = "http://localhost:8080"
+coder_organization = "coder"
+
+# Workspace Configuration
+workspace_name = "my-dev-workspace"
+
+# Resource Allocation
+cpu_cores    = 2
+memory_gb    = 4
+disk_size_gb = 10
+
+# Kubernetes
+kubernetes_namespace = "coder-workspaces"
+
+# Git Repository (optional)
+# git_repo_url = "https://github.com/your-org/your-repo.git"
+
+# Auto-start/stop Configuration
+# autostart_schedule = "0 9 * * MON-FRI"  # Start at 9 AM on weekdays
+ttl_hours = 8  # Auto-stop after 8 hours of inactivity

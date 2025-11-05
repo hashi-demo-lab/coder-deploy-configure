@@ -1,0 +1,62 @@
+# Coder Helm Chart Values for Docker Desktop Kubernetes
+# This configuration is optimized for local development
+
+coder:
+  # Environment variables for Coder
+  env:
+    # Database connection - references the Kubernetes secret
+    - name: CODER_PG_CONNECTION_URL
+      valueFrom:
+        secretKeyRef:
+          name: coder-db-url
+          key: url
+
+    # Access URL - using LoadBalancer IP for in-cluster agent connectivity
+    # External users can still access via port-forward to localhost:8080
+    - name: CODER_ACCESS_URL
+      value: "http://172.18.0.6"
+
+    # Wildcard access URL for workspace apps
+    - name: CODER_WILDCARD_ACCESS_URL
+      value: "*.localhost:8080"
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    # Docker Desktop Kubernetes will expose this on localhost
+    externalTrafficPolicy: Local
+    annotations: {}
+
+  # Image configuration
+  image:
+    repo: "ghcr.io/coder/coder"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  # Resources (adjust based on your local machine capacity)
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "10Gi"
+
+  # Replica count
+  replicaCount: 1
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Pod annotations
+  podAnnotations: {}
+
+  # Tolerations and affinity
+  tolerations: []
+  affinity: {}
+  nodeSelector: {}
