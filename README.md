@@ -1,16 +1,26 @@
-# Coder Deployment for Docker Desktop Kubernetes
+# Coder Deployment for Local Desktop Kubernetes
 
-This repository contains scripts and configuration files to deploy [Coder](https://coder.com) on Docker Desktop's built-in Kubernetes cluster for local development.
+This repository contains scripts and configuration files to deploy [Coder](https://coder.com) on Docker Desktop or Rancher Desktop Kubernetes for local development.
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed and configured:
 
-1. **Docker Desktop** with Kubernetes enabled
-   - Open Docker Desktop Settings
-   - Navigate to Kubernetes
-   - Check "Enable Kubernetes"
-   - Click "Apply & Restart"
+1. **Docker Desktop or Rancher Desktop** with Kubernetes enabled
+   - Docker Desktop: Open Settings, navigate to Kubernetes, enable Kubernetes, then apply the change.
+   - Rancher Desktop: Open Preferences, navigate to Kubernetes, then enable Kubernetes.
+
+   The active `kubectl` context must be `docker-desktop` or `rancher-desktop`.
+
+   ```bash
+   kubectl config current-context
+   ```
+
+   To explicitly select either supported context when running a script, set `KUBERNETES_CONTEXT`:
+
+   ```bash
+   KUBERNETES_CONTEXT=rancher-desktop ./deploy.sh
+   ```
 
 2. **kubectl** (Kubernetes command-line tool)
    ```bash
@@ -39,7 +49,13 @@ This script will:
 4. Install Coder using the official Helm chart
 5. Wait for all components to be ready
 
-Once deployment is complete, access Coder at: **http://localhost:8080**
+Once deployment is complete, forward the Coder service in a separate terminal:
+
+```bash
+kubectl port-forward --namespace coder service/coder 8080:80
+```
+
+Then access Coder at: **http://localhost:8080**
 
 ## Deploying the Claude Code Dev Container Template
 
@@ -101,7 +117,7 @@ See [workspace-provisioning/README.md](workspace-provisioning/README.md) for det
 
 - Namespace: `coder`
 - Helm Releases: `coder`, `postgresql`
-- Services: LoadBalancer service for Coder (accessible on localhost)
+- Services: ClusterIP service for Coder (accessed locally through `kubectl port-forward`)
 - Secrets: Database connection string
 - PersistentVolumeClaims: 10Gi for PostgreSQL data
 
@@ -109,7 +125,7 @@ See [workspace-provisioning/README.md](workspace-provisioning/README.md) for det
 
 The deployment is configured via `values.yaml`. Key settings include:
 
-- **Access URL**: `http://localhost:8080`
+- **Local access URL**: `http://localhost:8080` through `kubectl port-forward`
 - **Database**: PostgreSQL (user: `coder`, password: `coder`, database: `coder`)
 - **Resources**:
   - Requests: 250m CPU, 512Mi memory
@@ -132,17 +148,28 @@ After modifying `values.yaml`, redeploy:
 
 The script will upgrade the existing deployment with new values.
 
+### Environment Variables
+
+`deploy.sh` supports these optional environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `KUBERNETES_CONTEXT` | Current context | Explicitly select `docker-desktop` or `rancher-desktop`. |
+| `CODER_URL` | `http://localhost:8080` | URL shown after deployment and used by the helper scripts. |
+| `CODER_ACCESS_URL` | `CODER_URL` | URL Coder advertises to workspace agents. Set this to an address reachable from workspace pods. |
+| `CODER_WILDCARD_ACCESS_URL` | `*.localhost:8080` | Wildcard URL for workspace applications. |
+
 ## Usage
 
 ### Accessing Coder
 
 After deployment, open your browser and navigate to:
 
-```
-http://localhost:8080
+```bash
+kubectl port-forward --namespace coder service/coder 8080:80
 ```
 
-You'll be prompted to create an initial admin account.
+Then open `http://localhost:8080`. You'll be prompted to create an initial admin account.
 
 ### Viewing Logs
 
@@ -206,9 +233,9 @@ kubectl describe pod -n coder <pod-name>
 
 ### Cannot access Coder at localhost:8080
 
-1. Verify the LoadBalancer service is running:
+1. Start a service port-forward:
    ```bash
-   kubectl get svc -n coder
+   kubectl port-forward --namespace coder service/coder 8080:80
    ```
 
 2. Check if port 8080 is available on your system:
@@ -237,16 +264,18 @@ kubectl get pods -n coder -l app.kubernetes.io/name=postgresql
 
 ### Context issues
 
-Ensure you're using the docker-desktop context:
+Ensure you're using a supported context:
 
 ```bash
 kubectl config current-context
 ```
 
-If not, switch to it:
+If needed, switch to Docker Desktop or Rancher Desktop:
 
 ```bash
 kubectl config use-context docker-desktop
+# or
+kubectl config use-context rancher-desktop
 ```
 
 ## File Structure
@@ -277,13 +306,14 @@ kubectl config use-context docker-desktop
 - [Coder Kubernetes Installation Guide](https://coder.com/docs/install/kubernetes)
 - [Coder Helm Chart](https://github.com/coder/coder/tree/main/helm)
 - [Docker Desktop Kubernetes](https://docs.docker.com/desktop/kubernetes/)
+- [Rancher Desktop Kubernetes](https://docs.rancherdesktop.io/ui/preferences/kubernetes/)
 
 ## Notes
 
 - This setup uses an in-cluster PostgreSQL database suitable for local development and testing
 - For production deployments, use a managed PostgreSQL service
-- The deployment uses a LoadBalancer service type which Docker Desktop exposes on localhost
-- All data is stored in Kubernetes persistent volumes managed by Docker Desktop
+- The deployment uses a ClusterIP service; use `kubectl port-forward --namespace coder service/coder 8080:80` for local access.
+- All data is stored in Kubernetes persistent volumes managed by the configured desktop runtime.
 
 ## License
 

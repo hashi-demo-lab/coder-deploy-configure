@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Coder Cleanup Script for Docker Desktop Kubernetes
+# Coder Cleanup Script for Docker Desktop or Rancher Desktop Kubernetes
 # This script removes all Coder components from the cluster
 
 set -e  # Exit on error
@@ -26,7 +26,7 @@ fi
 
 echo ""
 
-check_docker_desktop_context
+check_desktop_kubernetes_context
 
 # Check if namespace exists
 if ! kubectl get namespace coder &> /dev/null; then

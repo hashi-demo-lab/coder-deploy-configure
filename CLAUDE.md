@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository deploys Coder on Docker Desktop's built-in Kubernetes cluster and provisions cloud development workspaces with a custom Claude Code devcontainer environment.
+This repository deploys Coder on Docker Desktop or Rancher Desktop Kubernetes and provisions cloud development workspaces with a custom Claude Code devcontainer environment.
 
 ## Common Commands
 
@@ -78,7 +78,7 @@ kubectl describe pod -n coder-workspaces <pod-name>
 
 ### Component Structure
 
-1. **Coder Platform** (`/` root): Helm-based Coder deployment on Docker Desktop Kubernetes
+1. **Coder Platform** (`/` root): Helm-based Coder deployment on Docker Desktop or Rancher Desktop Kubernetes
 2. **Workspace Template** (`coder-template/`): Terraform template defining workspace infrastructure
 3. **Workspace Provisioning** (`workspace-provisioning/`): Terraform configuration for creating workspaces as code
 
@@ -447,18 +447,12 @@ error: failed to download coder agent
 
 **Cause**: `CODER_ACCESS_URL` set to `http://localhost:8080` doesn't work from inside Kubernetes pods.
 
-**Solution**: Update `values.yaml` to use the LoadBalancer IP:
-```yaml
-- name: CODER_ACCESS_URL
-  value: "http://172.18.0.6"  # Use LoadBalancer IP, not localhost
-```
-
-Then upgrade the Coder deployment:
+**Solution**: Set `CODER_ACCESS_URL` to an address reachable from workspace pods when deploying:
 ```bash
-helm upgrade coder coder-v2/coder --namespace coder -f values.yaml
+CODER_ACCESS_URL=http://<reachable-coder-address> ./deploy.sh
 ```
 
-External users can still access Coder at `http://localhost:8080` via port-forward, while agents inside pods use the LoadBalancer IP to connect.
+Use `kubectl port-forward --namespace coder service/coder 8080:80` for local browser access.
 
 ### Template Modification Guidelines
 

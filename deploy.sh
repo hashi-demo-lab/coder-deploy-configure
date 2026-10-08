@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Coder Deployment Script for Docker Desktop Kubernetes
+# Coder Deployment Script for Docker Desktop or Rancher Desktop Kubernetes
 # This script automates the deployment of Coder on local Kubernetes
 
 set -e  # Exit on error
@@ -8,11 +8,19 @@ set -e  # Exit on error
 # Source common functions
 source "$(dirname "$0")/lib/common.sh"
 
-print_header "Coder Deployment for Docker Desktop K8s"
+print_header "Coder Deployment for Local Kubernetes"
 
 check_prerequisites
-check_docker_desktop_context
+check_desktop_kubernetes_context
 check_kubernetes
+
+CODER_URL="${CODER_URL:-http://localhost:8080}"
+CODER_ACCESS_URL="${CODER_ACCESS_URL:-$CODER_URL}"
+CODER_WILDCARD_ACCESS_URL="${CODER_WILDCARD_ACCESS_URL:-*.localhost:8080}"
+
+if [[ "$CODER_ACCESS_URL" == *"localhost"* ]] || [[ "$CODER_ACCESS_URL" == *"127.0.0.1"* ]]; then
+    print_warning "CODER_ACCESS_URL is local-only; set it to an address reachable from workspace pods before creating workspaces"
+fi
 
 # Step 1: Create namespace
 print_step "Step 1: Creating namespace 'coder'..."
@@ -66,7 +74,9 @@ if helm list -n coder | grep -q "^coder"; then
     helm repo update
     helm upgrade coder coder-v2/coder \
       --namespace coder \
-      -f values.yaml
+      -f values.yaml \
+      --set-string "coder.env[1].value=$CODER_ACCESS_URL" \
+      --set-string "coder.env[2].value=$CODER_WILDCARD_ACCESS_URL"
     print_success "Coder upgraded"
 else
     print_warning "Adding Coder Helm repository..."
@@ -76,7 +86,9 @@ else
     print_warning "Installing Coder..."
     helm install coder coder-v2/coder \
       --namespace coder \
-      -f values.yaml
+      -f values.yaml \
+      --set-string "coder.env[1].value=$CODER_ACCESS_URL" \
+      --set-string "coder.env[2].value=$CODER_WILDCARD_ACCESS_URL"
 
     print_success "Coder deployed"
 fi
@@ -90,7 +102,7 @@ print_success "Coder is ready!\n"
 # Step 6: Display access information
 print_header "Deployment Complete!"
 
-print_success "Coder is now running on your Docker Desktop Kubernetes cluster\n"
+print_success "Coder is now running on your local Kubernetes cluster\n"
 
 print_warning "Service Information:"
 kubectl get svc -n coder
@@ -100,8 +112,9 @@ print_warning "Pod Status:"
 kubectl get pods -n coder
 
 echo ""
-print_success "Access Coder at: ${BLUE}http://localhost:8080${NC}"
-print_warning "Note: It may take a few moments for the LoadBalancer service to be ready\n"
+print_warning "To access Coder locally, run this in another terminal:"
+echo "  kubectl port-forward --namespace coder service/coder 8080:80"
+print_success "Then open: ${BLUE}${CODER_URL}${NC}\n"
 
 print_warning "To view logs:"
 echo "  kubectl logs -n coder -l app.kubernetes.io/name=coder -f"
