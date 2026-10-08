@@ -32,21 +32,35 @@ print_error() {
     echo -e "${RED}$1${NC}"
 }
 
-# Check if running on Docker Desktop Kubernetes
-check_docker_desktop_context() {
-    local CURRENT_CONTEXT=$(kubectl config current-context)
-    if [ "$CURRENT_CONTEXT" != "docker-desktop" ]; then
-        print_warning "Current context is '$CURRENT_CONTEXT', not 'docker-desktop'"
-        print_warning "Switching to docker-desktop context..."
-        kubectl config use-context docker-desktop
+# Check that the configured context is a supported local Kubernetes runtime.
+check_desktop_kubernetes_context() {
+    local current_context
+    local target_context="${KUBERNETES_CONTEXT:-}"
+
+    current_context=$(kubectl config current-context)
+    if [ -n "$target_context" ] && [ "$current_context" != "$target_context" ]; then
+        print_warning "Switching from '$current_context' to '$target_context' context..."
+        kubectl config use-context "$target_context"
+        current_context="$target_context"
     fi
+
+    case "$current_context" in
+        docker-desktop|rancher-desktop)
+            print_success "Using Kubernetes context '$current_context'"
+            ;;
+        *)
+            print_error "Unsupported Kubernetes context '$current_context'"
+            print_error "Use Docker Desktop or Rancher Desktop, or set KUBERNETES_CONTEXT accordingly"
+            exit 1
+            ;;
+    esac
 }
 
 # Check Kubernetes connectivity
 check_kubernetes() {
     if ! kubectl cluster-info &> /dev/null; then
         print_error "Error: Cannot connect to Kubernetes cluster"
-        print_error "Please ensure Docker Desktop Kubernetes is enabled and running"
+        print_error "Please ensure your local Kubernetes runtime is enabled and running"
         exit 1
     fi
 }

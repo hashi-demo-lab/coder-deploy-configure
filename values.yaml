@@ -1,4 +1,4 @@
-# Coder Helm Chart Values for Docker Desktop Kubernetes
+# Coder Helm Chart Values for Docker Desktop or Rancher Desktop Kubernetes
 # This configuration is optimized for local development
 
 coder:
@@ -11,10 +11,10 @@ coder:
           name: coder-db-url
           key: url
 
-    # Access URL - using LoadBalancer IP for in-cluster agent connectivity
-    # External users can still access via port-forward to localhost:8080
+    # Override with CODER_ACCESS_URL when deploying if workspace pods require
+    # a non-loopback URL to reach Coder.
     - name: CODER_ACCESS_URL
-      value: "http://172.18.0.6"
+      value: "http://localhost:8080"
 
     # Wildcard access URL for workspace apps
     - name: CODER_WILDCARD_ACCESS_URL
@@ -22,9 +22,9 @@ coder:
 
   # Service configuration
   service:
-    type: LoadBalancer
-    # Docker Desktop Kubernetes will expose this on localhost
-    externalTrafficPolicy: Local
+    # A ClusterIP service works with both Docker Desktop and Rancher Desktop.
+    # Access it locally with the port-forward command shown by deploy.sh.
+    type: ClusterIP
     annotations: {}
 
   # Image configuration
@@ -49,7 +49,6 @@ coder:
   securityContext:
     runAsNonRoot: true
     runAsUser: 1000
-    fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
 
